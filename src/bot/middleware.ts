@@ -1,0 +1,39 @@
+import { session, type Bot, type MiddlewareFn } from "grammy";
+import { adminUserIds } from "../config/env.js";
+import { initialSession, type BotContext } from "../types/context.js";
+import { logger } from "../utils/logger.js";
+
+export function registerMiddleware(bot: Bot<BotContext>): void {
+  bot.use(session({ initial: initialSession }));
+
+  bot.use(async (ctx, next) => {
+    const startedAt = Date.now();
+
+    if (ctx.message?.text?.startsWith("/")) {
+      ctx.session.lastCommandAt = new Date().toISOString();
+    }
+
+    try {
+      await next();
+    } finally {
+      logger.info(
+        {
+          updateId: ctx.update.update_id,
+          chatId: ctx.chat?.id,
+          userId: ctx.from?.id,
+          durationMs: Date.now() - startedAt,
+        },
+        "Handled Telegram update",
+      );
+    }
+  });
+}
+
+export const requireAdmin: MiddlewareFn<BotContext> = async (ctx, next) => {
+  if (!ctx.from || !adminUserIds.has(ctx.from.id)) {
+    await ctx.reply("This command is only available to admins.");
+    return;
+  }
+
+  await next();
+};
