@@ -4,7 +4,12 @@ import { initialSession, type BotContext } from "../types/context.js";
 import { logger } from "../utils/logger.js";
 
 export function registerMiddleware(bot: Bot<BotContext>): void {
-  bot.use(session({ initial: initialSession }));
+  bot.use(
+    session({
+      initial: initialSession,
+      getSessionKey: (ctx) => (ctx.chat && ctx.from ? `${ctx.chat.id}:${ctx.from.id}` : undefined),
+    }),
+  );
 
   bot.use(async (ctx, next) => {
     const startedAt = Date.now();

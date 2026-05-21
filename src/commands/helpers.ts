@@ -18,7 +18,7 @@ export async function ensureKnownUser(
   userService: UserService,
 ): Promise<KnownTelegramUser | undefined> {
   if (!ctx.from || !ctx.chat) {
-    await ctx.reply("This command must be sent from a Telegram chat.");
+    await ctx.reply("⚠️ This command only works inside a Telegram chat.");
     return undefined;
   }
 
@@ -48,5 +48,5 @@ export async function replyWithUnexpectedError(ctx: BotContext, error: unknown):
     "Command failed",
   );
 
-  await ctx.reply("Sorry, I could not complete that request. Please try again later.");
+  await ctx.reply("⚠️ Something went wrong. Please try again in a moment.");
 }

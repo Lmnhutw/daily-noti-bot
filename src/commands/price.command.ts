@@ -4,60 +4,70 @@ import type { AppServices } from "../services/index.js";
 import { symbolsForTopic } from "../services/instrument-registry.js";
 import type { BotContext } from "../types/context.js";
 import { formatNumber, formatQuoteLine } from "../utils/format.js";
-import { ensureKnownUser, replyWithUnexpectedError } from "./helpers.js";
+import { ensureKnownUser } from "./helpers.js";
 
-const noDataText = "t\u1ea1m th\u1eddi kh\u00f4ng c\u00f3 s\u1ed1 li\u1ec7u";
+const noDataText = "unavailable";
 
 export function registerPriceCommands(bot: Bot<BotContext>, services: AppServices): void {
   bot.command("gold", async (ctx) => {
     try {
-      await ensureKnownUser(ctx, services.userService);
+      const user = await ensureKnownUser(ctx, services.userService);
+
+      if (!user) {
+        return;
+      }
+
       const result = await services.goldService.getAllGoldPrices();
       await ctx.reply(formatGoldAggregation(result));
     } catch (error) {
-      await replyWithUnexpectedError(ctx, error);
+      await replyWithPriceUnavailable(ctx, "gold prices");
     }
   });
 
   bot.command("fuel", async (ctx) => {
     try {
-      await ensureKnownUser(ctx, services.userService);
-      const result = await services.priceService.getAvailableQuotes(symbolsForTopic("fuel"));
+      const user = await ensureKnownUser(ctx, services.userService);
 
-      if (result.quotes.length === 0) {
-        await ctx.reply("Fuel prices are currently unavailable. Please try again later.");
+      if (!user) {
         return;
       }
 
-      const lines = ["Fuel prices", "", ...result.quotes.map(formatQuoteLine)];
+      const result = await services.priceService.getAvailableQuotes(symbolsForTopic("fuel"));
+
+      if (result.quotes.length === 0) {
+        await replyWithPriceUnavailable(ctx, "fuel prices");
+        return;
+      }
+
+      const lines = ["⛽ Fuel prices", "", ...result.quotes.map(formatQuoteLine)];
 
       if (result.failures.length > 0) {
-        lines.push("", `Unavailable: ${result.failures.join(", ")}`);
+        lines.push("", `⚠️ Unavailable: ${result.failures.join(", ")}`);
       }
 
       await ctx.reply(lines.join("\n"));
     } catch (error) {
-      await replyWithUnexpectedError(ctx, error);
+      await replyWithPriceUnavailable(ctx, "fuel prices");
     }
   });
 }
 
 function formatGoldAggregation(result: GoldAggregationResult): string {
   const lines = [
-    `So s\u00e1nh gi\u00e1 v\u00e0ng${result.fromCache ? " (d\u1eef li\u1ec7u cache)" : ""}`,
+    `🪙 Gold prices${result.fromCache ? " (cached)" : ""}`,
     "",
     ...result.providerResults.flatMap(formatGoldProviderResult),
   ];
 
   if (result.comparison.highestBuyPrice) {
-    lines.push("", `Gi\u00e1 mua cao nh\u1ea5t: ${result.comparison.highestBuyPrice.provider}`);
+    lines.push("", `📈 Highest buy: ${result.comparison.highestBuyPrice.provider}`);
   }
 
   if (result.comparison.lowestSellPrice) {
-    lines.push(`Gi\u00e1 b\u00e1n th\u1ea5p nh\u1ea5t: ${result.comparison.lowestSellPrice.provider}`);
+    lines.push(`📉 Lowest sell: ${result.comparison.lowestSellPrice.provider}`);
   }
 
-  lines.push("", `C\u1eadp nh\u1eadt: ${formatVietnamDateTime(result.fetchedAt)}`);
+  lines.push("", `🕒 Updated: ${formatVietnamDateTime(result.fetchedAt)}`);
 
   return lines.join("\n");
 }
@@ -76,20 +86,17 @@ function formatGoldPriceLine(price: NormalizedGoldPrice): string[] {
   const unitLabel = formatGoldUnit(unit);
 
   return [
-    `${price.provider}: mua ${formatPrice(price.buyPrice, currency)} / b\u00e1n ${formatPrice(
-      price.sellPrice,
-      currency,
-    )} / ${unitLabel}`,
-    `  1 ch\u1ec9: ${formatPerChi(price, currency, unit)}`,
+    `${price.provider}: Buy ${formatPrice(price.buyPrice, currency)} | Sell ${formatPrice(price.sellPrice, currency)} / ${unitLabel}`,
+    `1 chi: Buy ${formatPerChi(price.buyPrice, currency, unit)} | Sell ${formatPerChi(price.sellPrice, currency, unit)}`,
   ];
 }
 
-function formatPerChi(price: NormalizedGoldPrice, currency: string, unit: string): string {
+function formatPerChi(price: number, currency: string, unit: string): string {
   if (currency !== "VND" || !isLuongUnit(unit)) {
     return noDataText;
   }
 
-  return `mua ${formatPrice(price.buyPrice / 10, currency)} / b\u00e1n ${formatPrice(price.sellPrice / 10, currency)}`;
+  return formatPrice(price / 10, currency);
 }
 
 function formatPrice(value: number, currency: string): string {
@@ -110,11 +117,11 @@ function formatPrice(value: number, currency: string): string {
 
 function formatGoldUnit(unit: string): string {
   if (isLuongUnit(unit)) {
-    return "l\u01b0\u1ee3ng";
+    return "luong";
   }
 
   if (unit === "troy_ounce") {
-    return "ounce";
+    return "oz";
   }
 
   return unit;
@@ -130,4 +137,12 @@ function formatVietnamDateTime(isoDate: string): string {
     timeStyle: "short",
     timeZone: "Asia/Ho_Chi_Minh",
   }).format(new Date(isoDate));
+}
+
+async function replyWithPriceUnavailable(ctx: BotContext, label: string): Promise<void> {
+  await ctx.reply(`⚠️ ${capitalize(label)} are unavailable right now. Please try again shortly.`);
+}
+
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }

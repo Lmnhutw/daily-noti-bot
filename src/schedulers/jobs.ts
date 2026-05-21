@@ -30,17 +30,55 @@ export async function runAlertCheck(services: AppServices, bot: Bot<BotContext>)
     });
 
     if (!claimed) {
+      logger.info({ alertId: triggered.alert.id }, "Skipped alert notification because it was already claimed");
+      continue;
+    }
+
+    logger.info(
+      {
+        alertId: triggered.alert.id,
+        telegramId: triggered.alert.telegramId,
+        chatId: triggered.alert.chatId,
+        symbol: triggered.alert.symbol,
+        direction: triggered.alert.direction,
+        threshold: triggered.alert.threshold,
+        price: triggered.quote.price,
+      },
+      "Alert threshold reached",
+    );
+
+    let telegramSent = false;
+
+    try {
+      await bot.api.sendMessage(triggered.alert.chatId, triggered.message);
+      telegramSent = true;
+      sent += 1;
+      await services.alertService.markTriggered(triggered.alert.id, triggered.quote.price);
+      logger.info(
+        {
+          alertId: triggered.alert.id,
+          chatId: triggered.alert.chatId,
+          symbol: triggered.alert.symbol,
+          price: triggered.quote.price,
+        },
+        "Alert notification sent",
+      );
+    } catch (error) {
+      if (!telegramSent) {
+        await services.notificationLog.release(notificationKey);
+      }
+
+      logger.error(
+        { error, alertId: triggered.alert.id, telegramSent },
+        telegramSent ? "Failed to finalize alert after Telegram notification" : "Failed to send alert notification",
+      );
       continue;
     }
 
     try {
-      await bot.api.sendMessage(triggered.alert.chatId, triggered.message);
-      await services.alertService.markTriggered(triggered.alert.id, triggered.quote.price);
       await services.discordWebhookService.send(triggered.message);
-      sent += 1;
     } catch (error) {
-      await services.notificationLog.release(notificationKey);
-      logger.error({ error, alertId: triggered.alert.id }, "Failed to send alert notification");
+      logger.warn({ error, alertId: triggered.alert.id }, "Failed to mirror alert notification to Discord");
     }
   }
 
@@ -56,6 +94,13 @@ export async function runDailyUpdates(services: AppServices, bot: Bot<BotContext
   let sent = 0;
 
   for (const target of targets) {
+    const symbols = symbolsForTopic(target.topic);
+
+    if (symbols.length === 0) {
+      logger.info({ target }, "Skipped daily update because the subscription topic has no price provider");
+      continue;
+    }
+
     const notificationKey = `daily:${dateKey}:${target.chatId}:${target.topic}`;
     const claimed = await services.notificationLog.claim(notificationKey, "daily_update", {
       chatId: target.chatId,
@@ -67,7 +112,7 @@ export async function runDailyUpdates(services: AppServices, bot: Bot<BotContext
       continue;
     }
 
-    const result = await services.priceService.getAvailableQuotes(symbolsForTopic(target.topic));
+    const result = await services.priceService.getAvailableQuotes(symbols);
 
     if (result.quotes.length === 0) {
       await services.notificationLog.release(notificationKey);
@@ -76,14 +121,26 @@ export async function runDailyUpdates(services: AppServices, bot: Bot<BotContext
     }
 
     const message = formatDailyUpdateMessage(target.topic, result.quotes, result.failures);
+    let telegramSent = false;
 
     try {
       await bot.api.sendMessage(target.chatId, message);
-      await services.discordWebhookService.send(message);
+      telegramSent = true;
       sent += 1;
+      logger.info({ target, quoteCount: result.quotes.length }, "Daily update sent");
     } catch (error) {
-      await services.notificationLog.release(notificationKey);
+      if (!telegramSent) {
+        await services.notificationLog.release(notificationKey);
+      }
+
       logger.error({ error, target }, "Failed to send daily update");
+      continue;
+    }
+
+    try {
+      await services.discordWebhookService.send(message);
+    } catch (error) {
+      logger.warn({ error, target }, "Failed to mirror daily update to Discord");
     }
   }
 

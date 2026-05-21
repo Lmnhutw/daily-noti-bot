@@ -16,12 +16,14 @@ export interface SubscriptionInput {
 export class SubscriptionRepository {
   constructor(private readonly client: Client) {}
 
-  async add(input: SubscriptionInput): Promise<void> {
-    await this.client.execute({
+  async add(input: SubscriptionInput): Promise<boolean> {
+    const result = await this.client.execute({
       sql: `INSERT OR IGNORE INTO subscriptions (telegram_id, chat_id, topic, created_at)
         VALUES (?, ?, ?, ?)`,
       args: [input.telegramId, input.chatId, input.topic, new Date().toISOString()],
     });
+
+    return result.rowsAffected > 0;
   }
 
   async remove(input: SubscriptionInput): Promise<number> {

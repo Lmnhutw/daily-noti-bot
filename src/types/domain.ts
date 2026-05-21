@@ -11,7 +11,7 @@ export const commoditySymbols = [
 
 export type CommoditySymbol = (typeof commoditySymbols)[number];
 
-export const subscriptionTopics = ["gold", "metals", "fuel", "oil", "all"] as const;
+export const subscriptionTopics = ["gold", "fuel", "exchange_rates", "crypto", "stocks", "metals", "oil", "all"] as const;
 export type SubscriptionTopic = (typeof subscriptionTopics)[number];
 
 export const alertDirections = ["above", "below"] as const;

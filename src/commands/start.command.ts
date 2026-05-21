@@ -7,8 +7,13 @@ import { helpMessage } from "./help.command.js";
 export function registerStartCommand(bot: Bot<BotContext>, services: AppServices): void {
   bot.command("start", async (ctx) => {
     try {
-      await ensureKnownUser(ctx, services.userService);
-      await ctx.reply(["Price alerts are ready for this chat.", "", helpMessage].join("\n"));
+      const user = await ensureKnownUser(ctx, services.userService);
+
+      if (!user) {
+        return;
+      }
+
+      await ctx.reply(["👋 Price Tracker is ready in this chat.", "", helpMessage].join("\n"));
     } catch (error) {
       await replyWithUnexpectedError(ctx, error);
     }

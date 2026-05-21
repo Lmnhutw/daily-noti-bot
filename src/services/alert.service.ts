@@ -29,7 +29,22 @@ export class AlertService {
       throw new Error(`You can have at most ${env.MAX_ALERTS_PER_USER} active alerts`);
     }
 
-    return this.alerts.create(input);
+    const alert = await this.alerts.create(input);
+
+    logger.info(
+      {
+        alertId: alert.id,
+        telegramId: alert.telegramId,
+        chatId: alert.chatId,
+        symbol: alert.symbol,
+        direction: alert.direction,
+        threshold: alert.threshold,
+        currency: alert.currency,
+      },
+      "Alert created",
+    );
+
+    return alert;
   }
 
   async listActiveForChat(telegramId: number, chatId: number): Promise<PriceAlert[]> {

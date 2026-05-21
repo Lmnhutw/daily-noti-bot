@@ -1,4 +1,5 @@
 import type { PriceAlert, PriceQuote, SubscriptionTopic } from "../types/domain.js";
+import { formatSubscriptionTopic } from "../messages/subscription.messages.js";
 
 export function formatMoney(value: number, currency: string): string {
   return new Intl.NumberFormat("en-US", {
@@ -51,10 +52,10 @@ export function formatDailyUpdateMessage(
   quotes: PriceQuote[],
   failures: string[] = [],
 ): string {
-  const lines = [`Daily ${topic} update`, "", ...quotes.map(formatQuoteLine)];
+  const lines = [`🔔 Daily update: ${formatSubscriptionTopic(topic)}`, "", ...quotes.map(formatQuoteLine)];
 
   if (failures.length > 0) {
-    lines.push("", `Unavailable: ${failures.join(", ")}`);
+    lines.push("", `⚠️ Unavailable: ${failures.join(", ")}`);
   }
 
   return lines.join("\n");
@@ -62,7 +63,7 @@ export function formatDailyUpdateMessage(
 
 export function formatAlertMessage(alert: PriceAlert, quote: PriceQuote): string {
   return [
-    `Price alert #${alert.id}`,
+    `🚨 Price alert #${alert.id}`,
     `${quote.name} is ${alert.direction} ${formatMoney(alert.threshold, alert.currency)}.`,
     `Current: ${formatMoney(quote.price, quote.currency)} / ${quote.unit}`,
     `Updated: ${formatObservedAt(quote.observedAt)} UTC`,

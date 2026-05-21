@@ -14,9 +14,22 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
           cache: "npm"
+          cache-dependency-path: package-lock.json
       - run: npm ci
+      - run: npm run build
+      - name: Validate scheduled job secrets
+        shell: bash
+        run: |
+          test -n "$BOT_TOKEN" || { echo "BOT_TOKEN secret is required"; exit 1; }
+          test -n "$DATABASE_URL" || { echo "DATABASE_URL secret is required for scheduled jobs"; exit 1; }
+          case "$DATABASE_URL" in
+            file:*) echo "DATABASE_URL must point to a shared database for scheduled jobs"; exit 1 ;;
+          esac
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
       - run: npm run schedule:alerts
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
@@ -35,9 +48,22 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
           cache: "npm"
+          cache-dependency-path: package-lock.json
       - run: npm ci
+      - run: npm run build
+      - name: Validate scheduled job secrets
+        shell: bash
+        run: |
+          test -n "$BOT_TOKEN" || { echo "BOT_TOKEN secret is required"; exit 1; }
+          test -n "$DATABASE_URL" || { echo "DATABASE_URL secret is required for scheduled jobs"; exit 1; }
+          case "$DATABASE_URL" in
+            file:*) echo "DATABASE_URL must point to a shared database for scheduled jobs"; exit 1 ;;
+          esac
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
       - run: npm run schedule:daily
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
