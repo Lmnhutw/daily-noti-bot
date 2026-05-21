@@ -68,7 +68,16 @@ Mi Hong uses `https://api.mihong.vn/v1/gold-prices?market=domestic` by default. 
 
 The older Gold API integration remains available for non-gold metals through `https://api.gold-api.com/price/{symbol}` for `XAG`, `XPT`, `XPD`, and `HG`.
 
-The default fuel provider uses [EIA Open Data API v2](https://www.eia.gov/opendata/documentation.php) series IDs:
+The primary fuel provider uses `giaxanghomnay.com` with a date-based URL template:
+
+```dotenv
+FUEL_PRICE_API_URL_TEMPLATE=https://giaxanghomnay.com/api/pvdate/{{YYYY}}-{{MM}}-{{DD}}
+FUEL_PRICE_TIMEZONE=Asia/Ho_Chi_Minh
+```
+
+The bot fills the template with the current date in `FUEL_PRICE_TIMEZONE`, for example `https://giaxanghomnay.com/api/pvdate/2026-04-20`. Gasoline and diesel prices are normalized to VND per `lít`.
+
+If the Vietnamese fuel source fails, the fallback fuel provider uses [EIA Open Data API v2](https://www.eia.gov/opendata/documentation.php) series IDs:
 
 - `PET.EMM_EPMR_PTE_NUS_DPG.W` for U.S. regular gasoline.
 - `PET.EMD_EPD2D_PTE_NUS_DPG.W` for U.S. No. 2 diesel.

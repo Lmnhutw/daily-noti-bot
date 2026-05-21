@@ -10,6 +10,7 @@ import { AlertService } from "./alert.service.js";
 import { DiscordWebhookService } from "./discord-webhook.service.js";
 import { GoldService } from "./gold.service.js";
 import { EiaProvider } from "./price-providers/eia.provider.js";
+import { GiaXangHomNayProvider } from "./price-providers/gia-xang-hom-nay.provider.js";
 import { GoldApiProvider } from "./price-providers/gold-api.provider.js";
 import { PriceService } from "./price.service.js";
 import { SubscriptionService } from "./subscription.service.js";
@@ -40,12 +41,19 @@ export async function createAppServices(): Promise<AppServices> {
   const notificationLog = new NotificationLogRepository(client);
   const goldApiProvider = new GoldApiProvider();
   const eiaProvider = new EiaProvider();
+  const giaXangHomNayProvider = new GiaXangHomNayProvider();
   const goldService = new GoldService(
     createGoldProviders(),
     env.PRICE_CACHE_TTL_SECONDS * 1000,
     parseFallbackOrder(env.GOLD_PROVIDER_FALLBACK_ORDER),
   );
-  const priceService = new PriceService(goldApiProvider, eiaProvider, goldService, env.PRICE_CACHE_TTL_SECONDS * 1000);
+  const priceService = new PriceService(
+    goldApiProvider,
+    eiaProvider,
+    giaXangHomNayProvider,
+    goldService,
+    env.PRICE_CACHE_TTL_SECONDS * 1000,
+  );
   const userService = new UserService(users);
   const subscriptionService = new SubscriptionService(subscriptions);
   const alertService = new AlertService(alerts, priceService);

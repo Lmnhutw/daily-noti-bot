@@ -50,6 +50,8 @@ const envSchema = z.object({
   PNJ_GOLD_HTML_URL: defaultedString("https://www.pnj.com.vn/blog/gia-vang/"),
   GLOBAL_GOLD_API_URL: defaultedString("https://api.mihong.vn/v1/gold-prices?market=global"),
   GLOBAL_GOLD_HTML_URL: defaultedString("https://www.mihong.vn/"),
+  FUEL_PRICE_API_URL_TEMPLATE: defaultedString("https://giaxanghomnay.com/api/pvdate/{{YYYY}}-{{MM}}-{{DD}}"),
+  FUEL_PRICE_TIMEZONE: defaultedString("Asia/Ho_Chi_Minh"),
   EIA_API_BASE_URL: defaultedString("https://api.eia.gov"),
   EIA_API_KEY: optionalString,
   DAILY_UPDATE_TIMEZONE: defaultedString("Asia/Ho_Chi_Minh"),

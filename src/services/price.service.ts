@@ -3,6 +3,7 @@ import { saveFuelPrice } from "../db/index.js";
 import { instruments } from "./instrument-registry.js";
 import type { GoldService } from "./gold.service.js";
 import type { EiaProvider } from "./price-providers/eia.provider.js";
+import type { GiaXangHomNayProvider } from "./price-providers/gia-xang-hom-nay.provider.js";
 import type { GoldApiProvider } from "./price-providers/gold-api.provider.js";
 
 interface CachedQuote {
@@ -21,6 +22,7 @@ export class PriceService {
   constructor(
     private readonly goldApiProvider: GoldApiProvider,
     private readonly eiaProvider: EiaProvider,
+    private readonly giaXangHomNayProvider: GiaXangHomNayProvider,
     private readonly goldService: GoldService,
     private readonly cacheTtlMs: number,
   ) {}
@@ -37,6 +39,8 @@ export class PriceService {
     const quote =
       symbol === "gold"
         ? (await this.goldService.getFallbackGoldPrice()).quote
+        : symbol === "gasoline" || symbol === "diesel"
+          ? await this.fetchVietnamFuelQuoteWithFallback(symbol)
         : instrument.provider === "gold-api"
           ? await this.goldApiProvider.fetchQuote(symbol)
           : await this.eiaProvider.fetchQuote(symbol);
@@ -88,9 +92,17 @@ export class PriceService {
         source: quote.source,
         fuelType: quote.symbol,
         price: quote.price,
-        region: "US",
+        region: quote.currency === "VND" ? "VN" : "US",
         rawJson: quote,
       });
+    }
+  }
+
+  private async fetchVietnamFuelQuoteWithFallback(symbol: "gasoline" | "diesel"): Promise<PriceQuote> {
+    try {
+      return await this.giaXangHomNayProvider.fetchQuote(symbol);
+    } catch {
+      return this.eiaProvider.fetchQuote(symbol);
     }
   }
 }
