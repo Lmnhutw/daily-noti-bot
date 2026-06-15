@@ -1,5 +1,6 @@
 import type { PriceAlert, PriceQuote, SubscriptionTopic } from "../types/domain.js";
 import { formatSubscriptionTopic } from "../messages/subscription.messages.js";
+import { bold, escapeHtml } from "./telegram-format.js";
 
 export function formatMoney(value: number, currency: string): string {
   return new Intl.NumberFormat("en-US", {
@@ -34,16 +35,20 @@ export function formatQuoteLine(quote: PriceQuote): string {
     changeParts.push(`${quote.changePercent >= 0 ? "+" : ""}${formatNumber(quote.changePercent)}%`);
   }
 
-  const change = changeParts.length > 0 ? ` (${changeParts.join(", ")})` : "";
+  const lines = [`• ${bold(quote.name)}`, `  Price: ${bold(formatMoney(quote.price, quote.currency))} / ${escapeHtml(quote.unit)}`];
 
-  return `${quote.name}: ${formatMoney(quote.price, quote.currency)} / ${quote.unit}${change}`;
+  if (changeParts.length > 0) {
+    lines.push(`  Change: ${bold(changeParts.join(" / "))}`);
+  }
+
+  return lines.join("\n");
 }
 
 export function formatQuoteDetails(quote: PriceQuote): string {
   return [
     formatQuoteLine(quote),
-    `Updated: ${formatObservedAt(quote.observedAt)} UTC`,
-    `Source: ${quote.source}`,
+    `  Updated: ${escapeHtml(formatObservedAt(quote.observedAt))} UTC`,
+    `  Source: ${escapeHtml(quote.source)}`,
   ].join("\n");
 }
 
@@ -52,10 +57,10 @@ export function formatDailyUpdateMessage(
   quotes: PriceQuote[],
   failures: string[] = [],
 ): string {
-  const lines = [`🔔 Daily update: ${formatSubscriptionTopic(topic)}`, "", ...quotes.map(formatQuoteLine)];
+  const lines = [`🔔 ${bold("Daily update")}: ${bold(formatSubscriptionTopic(topic))}`, "", ...quotes.map(formatQuoteLine)];
 
   if (failures.length > 0) {
-    lines.push("", `⚠️ Unavailable: ${failures.join(", ")}`);
+    lines.push("", `⚠️ ${bold("Unavailable")}: ${escapeHtml(failures.join(", "))}`);
   }
 
   return lines.join("\n");
@@ -63,9 +68,10 @@ export function formatDailyUpdateMessage(
 
 export function formatAlertMessage(alert: PriceAlert, quote: PriceQuote): string {
   return [
-    `🚨 Price alert #${alert.id}`,
-    `${quote.name} is ${alert.direction} ${formatMoney(alert.threshold, alert.currency)}.`,
-    `Current: ${formatMoney(quote.price, quote.currency)} / ${quote.unit}`,
-    `Updated: ${formatObservedAt(quote.observedAt)} UTC`,
+    `🚨 ${bold(`Price alert #${alert.id}`)}`,
+    "",
+    `${bold(quote.name)} is ${bold(alert.direction)} ${bold(formatMoney(alert.threshold, alert.currency))}.`,
+    `Current: ${bold(formatMoney(quote.price, quote.currency))} / ${escapeHtml(quote.unit)}`,
+    `Updated: ${escapeHtml(formatObservedAt(quote.observedAt))} UTC`,
   ].join("\n");
 }

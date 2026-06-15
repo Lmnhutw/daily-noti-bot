@@ -4,6 +4,7 @@ import type { AppServices } from "../services/index.js";
 import { symbolsForTopic } from "../services/instrument-registry.js";
 import type { BotContext } from "../types/context.js";
 import { formatNumber, formatQuoteLine } from "../utils/format.js";
+import { bold, escapeHtml, htmlMessageOptions } from "../utils/telegram-format.js";
 import { ensureKnownUser } from "./helpers.js";
 
 const noDataText = "unavailable";
@@ -18,7 +19,7 @@ export function registerPriceCommands(bot: Bot<BotContext>, services: AppService
       }
 
       const result = await services.goldService.getAllGoldPrices();
-      await ctx.reply(formatGoldAggregation(result));
+      await ctx.reply(formatGoldAggregation(result), htmlMessageOptions);
     } catch (error) {
       await replyWithPriceUnavailable(ctx, "gold prices");
     }
@@ -39,13 +40,13 @@ export function registerPriceCommands(bot: Bot<BotContext>, services: AppService
         return;
       }
 
-      const lines = ["⛽ Fuel prices", "", ...result.quotes.map(formatQuoteLine)];
+      const lines = [`⛽ ${bold("Fuel prices")}`, "", ...result.quotes.map(formatQuoteLine)];
 
       if (result.failures.length > 0) {
-        lines.push("", `⚠️ Unavailable: ${result.failures.join(", ")}`);
+        lines.push("", `⚠️ ${bold("Unavailable")}: ${escapeHtml(result.failures.join(", "))}`);
       }
 
-      await ctx.reply(lines.join("\n"));
+      await ctx.reply(lines.join("\n"), htmlMessageOptions);
     } catch (error) {
       await replyWithPriceUnavailable(ctx, "fuel prices");
     }
@@ -53,28 +54,33 @@ export function registerPriceCommands(bot: Bot<BotContext>, services: AppService
 }
 
 function formatGoldAggregation(result: GoldAggregationResult): string {
+  const providerLines = result.providerResults.flatMap((providerResult, index) => {
+    const lines = formatGoldProviderResult(providerResult);
+    return index === 0 ? lines : ["", ...lines];
+  });
+
   const lines = [
-    `🪙 Gold prices${result.fromCache ? " (cached)" : ""}`,
+    `🪙 ${bold("Gold prices")}${result.fromCache ? " (cached)" : ""}`,
     "",
-    ...result.providerResults.flatMap(formatGoldProviderResult),
+    ...providerLines,
   ];
 
   if (result.comparison.highestBuyPrice) {
-    lines.push("", `📈 Highest buy: ${result.comparison.highestBuyPrice.provider}`);
+    lines.push("", `📈 ${bold("Highest buy")}: ${escapeHtml(result.comparison.highestBuyPrice.provider)}`);
   }
 
   if (result.comparison.lowestSellPrice) {
-    lines.push(`📉 Lowest sell: ${result.comparison.lowestSellPrice.provider}`);
+    lines.push(`📉 ${bold("Lowest sell")}: ${escapeHtml(result.comparison.lowestSellPrice.provider)}`);
   }
 
-  lines.push("", `🕒 Updated: ${formatVietnamDateTime(result.fetchedAt)}`);
+  lines.push("", `🕒 ${bold("Updated")}: ${escapeHtml(formatVietnamDateTime(result.fetchedAt))}`);
 
   return lines.join("\n");
 }
 
 function formatGoldProviderResult(result: GoldProviderResult): string[] {
   if (!result.price) {
-    return [`${result.provider}: ${noDataText}`];
+    return [`• ${bold(result.provider)}\n  ${escapeHtml(noDataText)}`];
   }
 
   return formatGoldPriceLine(result.price);
@@ -86,8 +92,10 @@ function formatGoldPriceLine(price: NormalizedGoldPrice): string[] {
   const unitLabel = formatGoldUnit(unit);
 
   return [
-    `${price.provider}: Buy ${formatPrice(price.buyPrice, currency)} | Sell ${formatPrice(price.sellPrice, currency)} / ${unitLabel}`,
-    `1 chi: Buy ${formatPerChi(price.buyPrice, currency, unit)} | Sell ${formatPerChi(price.sellPrice, currency, unit)}`,
+    `• ${bold(price.provider)}`,
+    `  Buy: ${bold(formatPrice(price.buyPrice, currency))}`,
+    `  Sell: ${bold(formatPrice(price.sellPrice, currency))} / ${escapeHtml(unitLabel)}`,
+    `  1 chi: Buy ${escapeHtml(formatPerChi(price.buyPrice, currency, unit))} | Sell ${escapeHtml(formatPerChi(price.sellPrice, currency, unit))}`,
   ];
 }
 
@@ -140,7 +148,7 @@ function formatVietnamDateTime(isoDate: string): string {
 }
 
 async function replyWithPriceUnavailable(ctx: BotContext, label: string): Promise<void> {
-  await ctx.reply(`⚠️ ${capitalize(label)} are unavailable right now. Please try again shortly.`);
+  await ctx.reply(`⚠️ ${bold(capitalize(label))} are unavailable right now. Please try again shortly.`, htmlMessageOptions);
 }
 
 function capitalize(value: string): string {

@@ -1,6 +1,7 @@
 import type { BotContext } from "../types/context.js";
 import { logger } from "../utils/logger.js";
 import type { UserService } from "../services/user.service.js";
+import { htmlMessageOptions } from "../utils/telegram-format.js";
 
 export interface KnownTelegramUser {
   telegramId: number;
@@ -18,7 +19,7 @@ export async function ensureKnownUser(
   userService: UserService,
 ): Promise<KnownTelegramUser | undefined> {
   if (!ctx.from || !ctx.chat) {
-    await ctx.reply("⚠️ This command only works inside a Telegram chat.");
+    await ctx.reply("⚠️ This command only works inside a Telegram chat.", htmlMessageOptions);
     return undefined;
   }
 
@@ -48,5 +49,5 @@ export async function replyWithUnexpectedError(ctx: BotContext, error: unknown):
     "Command failed",
   );
 
-  await ctx.reply("⚠️ Something went wrong. Please try again in a moment.");
+  await ctx.reply("⚠️ Something went wrong. Please try again in a moment.", htmlMessageOptions);
 }

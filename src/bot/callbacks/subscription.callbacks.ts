@@ -10,6 +10,7 @@ import type { BotContext, SubscriptionSelectionSession } from "../../types/conte
 import type { SubscriptionTopic } from "../../types/domain.js";
 import { replyWithUnexpectedError } from "../../commands/helpers.js";
 import { logger } from "../../utils/logger.js";
+import { bold, htmlMessageOptions } from "../../utils/telegram-format.js";
 
 export function registerSubscriptionCallbacks(bot: Bot<BotContext>, services: AppServices): void {
   bot.callbackQuery(/^sub:/, async (ctx) => {
@@ -31,7 +32,7 @@ export function registerSubscriptionCallbacks(bot: Bot<BotContext>, services: Ap
       if (callback.action === "cancel") {
         delete ctx.session.subscriptionSelection;
         await ctx.answerCallbackQuery("Cancelled");
-        await ctx.editMessageText("🟡 Subscription update cancelled.\n\nNo changes were saved.");
+        await ctx.editMessageText(`🟡 ${bold("Subscription update cancelled")}\n\nNo changes were saved.`, htmlMessageOptions);
         return;
       }
 
@@ -66,7 +67,10 @@ export function registerSubscriptionCallbacks(bot: Bot<BotContext>, services: Ap
         );
 
         await ctx.answerCallbackQuery("Saved");
-        await ctx.editMessageText(`✅ Daily updates enabled for: ${formatSubscriptionTopics(selectedTopics)}.`);
+        await ctx.editMessageText(
+          `✅ ${bold("Daily updates enabled")}: ${formatSubscriptionTopics(selectedTopics)}.`,
+          htmlMessageOptions,
+        );
         return;
       }
 
@@ -76,6 +80,7 @@ export function registerSubscriptionCallbacks(bot: Bot<BotContext>, services: Ap
 
         await ctx.answerCallbackQuery();
         await ctx.editMessageText(formatSubscriptionSelectionMessage(selection.selectedTopics), {
+          ...htmlMessageOptions,
           reply_markup: buildSubscriptionSelectionKeyboard(selection.id, selection.selectedTopics),
         });
       }

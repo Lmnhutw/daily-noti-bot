@@ -1,19 +1,37 @@
-import { getTelegramWebhookHandler } from "../src/bot/webhook.js";
+import { getTelegramNodeWebhookHandler } from "../src/bot/webhook.js";
 
-export async function GET(): Promise<Response> {
-  return Response.json({ ok: true, endpoint: "/api/telegram" });
-}
+type VercelRequest = {
+  method?: string;
+  body?: unknown;
+  headers: Record<string, string | string[] | undefined>;
+};
 
-export async function POST(request: Request): Promise<Response> {
-  const handler = await getTelegramWebhookHandler();
-  return handler(request);
-}
+type VercelResponse = {
+  end: (callback?: () => void) => VercelResponse;
+  setHeader: (name: string, value: string) => void;
+  status: (code: number) => VercelResponse;
+  json: (body: unknown) => unknown;
+  send: (body: string) => unknown;
+};
 
-export function OPTIONS(): Response {
-  return new Response(null, {
-    status: 204,
-    headers: {
-      Allow: "GET, POST, OPTIONS",
-    },
-  });
+export default async function handler(request: VercelRequest, response: VercelResponse): Promise<void> {
+  if (request.method === "GET") {
+    response.status(200).json({ ok: true, endpoint: "/api/telegram" });
+    return;
+  }
+
+  if (request.method === "OPTIONS") {
+    response.setHeader("Allow", "GET, POST, OPTIONS");
+    response.status(204).end();
+    return;
+  }
+
+  if (request.method !== "POST") {
+    response.setHeader("Allow", "GET, POST, OPTIONS");
+    response.status(405).json({ ok: false, error: "Method not allowed" });
+    return;
+  }
+
+  const webhookHandler = await getTelegramNodeWebhookHandler();
+  await webhookHandler(request, response);
 }

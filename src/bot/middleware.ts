@@ -2,6 +2,7 @@ import { session, type Bot, type MiddlewareFn, type StorageAdapter } from "gramm
 import { adminUserIds } from "../config/env.js";
 import { initialSession, type BotContext, type SessionData } from "../types/context.js";
 import { logger } from "../utils/logger.js";
+import { htmlMessageOptions } from "../utils/telegram-format.js";
 
 export function registerMiddleware(bot: Bot<BotContext>, storage?: StorageAdapter<SessionData>): void {
   bot.use(
@@ -37,7 +38,7 @@ export function registerMiddleware(bot: Bot<BotContext>, storage?: StorageAdapte
 
 export const requireAdmin: MiddlewareFn<BotContext> = async (ctx, next) => {
   if (!ctx.from || !adminUserIds.has(ctx.from.id)) {
-    await ctx.reply("This command is only available to admins.");
+    await ctx.reply("⚠️ This command is only available to admins.", htmlMessageOptions);
     return;
   }
 

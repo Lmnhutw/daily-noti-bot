@@ -1,5 +1,6 @@
 import { InlineKeyboard } from "grammy";
 import type { SubscriptionTopic } from "../types/domain.js";
+import { bold, escapeHtml } from "../utils/telegram-format.js";
 
 export const selectableSubscriptionTopics = [
   "gold",
@@ -35,20 +36,22 @@ export function formatSubscriptionTopic(topic: SubscriptionTopic): string {
 }
 
 export function formatSubscriptionTopics(topics: SubscriptionTopic[]): string {
-  return topics.map(formatSubscriptionTopic).join(", ");
+  return topics.map((topic) => escapeHtml(formatSubscriptionTopic(topic))).join(", ");
 }
 
 export function formatSubscriptionSelectionMessage(selectedTopics: SubscriptionTopic[]): string {
   const current =
-    selectedTopics.length > 0 ? `\n\nSelected: ${formatSubscriptionTopics(selectedTopics)}` : "\n\nSelected: none yet";
+    selectedTopics.length > 0
+      ? `\n\n${bold("Selected")}: ${formatSubscriptionTopics(selectedTopics)}`
+      : `\n\n${bold("Selected")}: none yet`;
 
-  return `🔔 Choose topics for daily updates.${current}`;
+  return `🔔 ${bold("Choose topics for daily updates")}.${current}`;
 }
 
 export function formatCurrentSubscriptions(topics: SubscriptionTopic[]): string {
   return topics.length > 0
-    ? `🔔 Current subscriptions: ${formatSubscriptionTopics(topics)}`
-    : "🔔 Current subscriptions: none";
+    ? `🔔 ${bold("Current subscriptions")}: ${formatSubscriptionTopics(topics)}`
+    : `🔔 ${bold("Current subscriptions")}: none`;
 }
 
 export function buildSubscriptionSelectionKeyboard(stateId: string, selectedTopics: SubscriptionTopic[]): InlineKeyboard {
@@ -63,8 +66,8 @@ export function buildSubscriptionSelectionKeyboard(stateId: string, selectedTopi
     .row()
     .text(topicButtonLabel("stocks", selected), callbackData("toggle", stateId, "stocks"))
     .row()
-    .text("Confirm", callbackData("confirm", stateId))
-    .text("Cancel", callbackData("cancel", stateId));
+    .text("✅ Confirm", callbackData("confirm", stateId))
+    .text("✖️ Cancel", callbackData("cancel", stateId));
 }
 
 export function subscriptionSelectionCallbackPattern(): RegExp {
@@ -134,5 +137,5 @@ function callbackData(action: "toggle" | "confirm" | "cancel", stateId: string, 
 }
 
 function topicButtonLabel(topic: (typeof selectableSubscriptionTopics)[number], selected: Set<SubscriptionTopic>): string {
-  return `${selected.has(topic) ? "✅" : "⬜"} ${buttonLabels[topic]}`;
+  return `${selected.has(topic) ? "✅" : "☐"} ${buttonLabels[topic]}`;
 }

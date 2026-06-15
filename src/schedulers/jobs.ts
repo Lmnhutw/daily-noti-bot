@@ -6,6 +6,7 @@ import type { BotContext } from "../types/context.js";
 import { dateKeyForTimeZone } from "../utils/date.js";
 import { formatDailyUpdateMessage } from "../utils/format.js";
 import { logger } from "../utils/logger.js";
+import { htmlMessageOptions } from "../utils/telegram-format.js";
 
 export interface AlertJobResult {
   triggered: number;
@@ -50,7 +51,7 @@ export async function runAlertCheck(services: AppServices, bot: Bot<BotContext>)
     let telegramSent = false;
 
     try {
-      await bot.api.sendMessage(triggered.alert.chatId, triggered.message);
+      await bot.api.sendMessage(triggered.alert.chatId, triggered.message, htmlMessageOptions);
       telegramSent = true;
       sent += 1;
       await services.alertService.markTriggered(triggered.alert.id, triggered.quote.price);
@@ -124,7 +125,7 @@ export async function runDailyUpdates(services: AppServices, bot: Bot<BotContext
     let telegramSent = false;
 
     try {
-      await bot.api.sendMessage(target.chatId, message);
+      await bot.api.sendMessage(target.chatId, message, htmlMessageOptions);
       telegramSent = true;
       sent += 1;
       logger.info({ target, quoteCount: result.quotes.length }, "Daily update sent");

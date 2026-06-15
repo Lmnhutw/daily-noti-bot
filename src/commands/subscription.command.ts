@@ -15,13 +15,15 @@ import { normalizeSubscriptionTopic } from "../services/instrument-registry.js";
 import type { BotContext } from "../types/context.js";
 import type { SubscriptionTopic } from "../types/domain.js";
 import { logger } from "../utils/logger.js";
+import { bold, code, htmlMessageOptions } from "../utils/telegram-format.js";
 import { commandArgs, ensureKnownUser, replyWithUnexpectedError } from "./helpers.js";
 
 const subscriptionUsage = [
-  "🔔 Subscription commands",
-  "/subscribe",
-  "/subscribe gold|fuel|exchange_rates|crypto|stocks",
-  "/unsubscribe gold|fuel|exchange_rates|crypto|stocks|all",
+  "🔔 <b>Subscription commands</b>",
+  "",
+  `${code("/subscribe")} - Open topic picker`,
+  `${code("/subscribe gold|fuel|exchange_rates|crypto|stocks")} - Subscribe directly`,
+  `${code("/unsubscribe gold|fuel|exchange_rates|crypto|stocks|all")} - Remove subscriptions`,
 ].join("\n");
 
 export function registerSubscriptionCommands(bot: Bot<BotContext>, services: AppServices): void {
@@ -72,7 +74,7 @@ export function registerSubscriptionCommands(bot: Bot<BotContext>, services: App
         "Subscriptions added from command",
       );
 
-      await ctx.reply(`✅ Daily updates enabled for: ${formatSubscriptionTopics(topics)}.`);
+      await ctx.reply(`✅ ${bold("Daily updates enabled")}: ${formatSubscriptionTopics(topics)}.`, htmlMessageOptions);
     } catch (error) {
       await replyWithUnexpectedError(ctx, error);
     }
@@ -119,6 +121,7 @@ export function registerSubscriptionCommands(bot: Bot<BotContext>, services: App
             ? "✅ All subscriptions were removed for this chat."
             : `✅ Removed ${removed} subscription${removed === 1 ? "" : "s"}.`
           : "ℹ️ No matching subscriptions were found for this chat.",
+        htmlMessageOptions,
       );
     } catch (error) {
       await replyWithUnexpectedError(ctx, error);
@@ -136,7 +139,7 @@ async function replyWithSubscriptions(
   const subscriptions = await services.subscriptionService.listForChat(telegramId, chatId);
   const current = formatCurrentSubscriptions(subscriptions.map((subscription) => subscription.topic));
 
-  await ctx.reply([prefix, "", current].join("\n"));
+  await ctx.reply([prefix, "", current].join("\n"), htmlMessageOptions);
 }
 
 async function replyWithSubscriptionSelection(
@@ -158,6 +161,7 @@ async function replyWithSubscriptionSelection(
   };
 
   await ctx.reply(formatSubscriptionSelectionMessage(selectedTopics), {
+    ...htmlMessageOptions,
     reply_markup: buildSubscriptionSelectionKeyboard(stateId, selectedTopics),
   });
 }

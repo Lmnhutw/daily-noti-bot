@@ -1,6 +1,7 @@
 import axios from "axios";
 import { env } from "../config/env.js";
 import { logger } from "../utils/logger.js";
+import { stripTelegramHtml } from "../utils/telegram-format.js";
 
 export class DiscordWebhookService {
   async send(content: string): Promise<void> {
@@ -11,7 +12,7 @@ export class DiscordWebhookService {
     try {
       await axios.post(
         env.DISCORD_WEBHOOK_URL,
-        { content },
+        { content: stripTelegramHtml(content) },
         {
           timeout: env.HTTP_TIMEOUT_MS,
         },
