@@ -1,11 +1,11 @@
-import type { Client } from "@libsql/client";
+import type { Subscription as SubscriptionRecord } from "@prisma/client";
 import {
   subscriptionTopics,
   type Subscription,
   type SubscriptionTarget,
   type SubscriptionTopic,
 } from "../types/domain.js";
-import { requiredNumber, requiredString, type DbRow } from "./row.js";
+import type { DatabaseClient } from "./database.js";
 
 export interface SubscriptionInput {
   telegramId: number;
@@ -14,73 +14,90 @@ export interface SubscriptionInput {
 }
 
 export class SubscriptionRepository {
-  constructor(private readonly client: Client) {}
+  constructor(private readonly client: DatabaseClient) {}
 
   async add(input: SubscriptionInput): Promise<boolean> {
-    const result = await this.client.execute({
-      sql: `INSERT OR IGNORE INTO subscriptions (telegram_id, chat_id, topic, created_at)
-        VALUES (?, ?, ?, ?)`,
-      args: [input.telegramId, input.chatId, input.topic, new Date().toISOString()],
-    });
+    try {
+      await this.client.subscription.create({
+        data: {
+          telegramId: BigInt(input.telegramId),
+          chatId: BigInt(input.chatId),
+          topic: input.topic,
+        },
+      });
 
-    return result.rowsAffected > 0;
+      return true;
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        return false;
+      }
+
+      throw error;
+    }
   }
 
   async remove(input: SubscriptionInput): Promise<number> {
-    const result = await this.client.execute({
-      sql: `DELETE FROM subscriptions
-        WHERE telegram_id = ? AND chat_id = ? AND topic = ?`,
-      args: [input.telegramId, input.chatId, input.topic],
+    const result = await this.client.subscription.deleteMany({
+      where: {
+        telegramId: BigInt(input.telegramId),
+        chatId: BigInt(input.chatId),
+        topic: input.topic,
+      },
     });
 
-    return result.rowsAffected;
+    return result.count;
   }
 
   async removeAllForChat(telegramId: number, chatId: number): Promise<number> {
-    const result = await this.client.execute({
-      sql: "DELETE FROM subscriptions WHERE telegram_id = ? AND chat_id = ?",
-      args: [telegramId, chatId],
+    const result = await this.client.subscription.deleteMany({
+      where: {
+        telegramId: BigInt(telegramId),
+        chatId: BigInt(chatId),
+      },
     });
 
-    return result.rowsAffected;
+    return result.count;
   }
 
   async listForChat(telegramId: number, chatId: number): Promise<Subscription[]> {
-    const result = await this.client.execute({
-      sql: `SELECT * FROM subscriptions
-        WHERE telegram_id = ? AND chat_id = ?
-        ORDER BY topic ASC`,
-      args: [telegramId, chatId],
+    const rows = await this.client.subscription.findMany({
+      where: {
+        telegramId: BigInt(telegramId),
+        chatId: BigInt(chatId),
+      },
+      orderBy: { topic: "asc" },
     });
 
-    return result.rows.map((row) => this.toSubscription(row as DbRow));
+    return rows.map((row) => this.toSubscription(row));
   }
 
   async listDeliveryTargets(): Promise<SubscriptionTarget[]> {
-    const result = await this.client.execute(
-      `SELECT DISTINCT chat_id, topic
-       FROM subscriptions
-       ORDER BY chat_id ASC, topic ASC`,
-    );
+    const rows = await this.client.subscription.findMany({
+      distinct: ["chatId", "topic"],
+      orderBy: [{ chatId: "asc" }, { topic: "asc" }],
+      select: {
+        chatId: true,
+        topic: true,
+      },
+    });
 
-    return result.rows.map((row) => ({
-      chatId: requiredNumber(row as DbRow, "chat_id"),
-      topic: this.parseTopic(requiredString(row as DbRow, "topic")),
+    return rows.map((row) => ({
+      chatId: Number(row.chatId),
+      topic: this.parseTopic(row.topic),
     }));
   }
 
   async count(): Promise<number> {
-    const result = await this.client.execute("SELECT COUNT(*) AS total FROM subscriptions");
-    return requiredNumber(result.rows[0] as DbRow, "total");
+    return this.client.subscription.count();
   }
 
-  private toSubscription(row: DbRow): Subscription {
+  private toSubscription(row: SubscriptionRecord): Subscription {
     return {
-      id: requiredNumber(row, "id"),
-      telegramId: requiredNumber(row, "telegram_id"),
-      chatId: requiredNumber(row, "chat_id"),
-      topic: this.parseTopic(requiredString(row, "topic")),
-      createdAt: requiredString(row, "created_at"),
+      id: row.id,
+      telegramId: Number(row.telegramId),
+      chatId: Number(row.chatId),
+      topic: this.parseTopic(row.topic),
+      createdAt: row.createdAt.toISOString(),
     };
   }
 
@@ -91,4 +108,8 @@ export class SubscriptionRepository {
 
     throw new Error(`Unknown subscription topic in database: ${value}`);
   }
+}
+
+function isUniqueConstraintError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
 }

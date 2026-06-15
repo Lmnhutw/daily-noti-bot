@@ -1,5 +1,5 @@
 import type { CommoditySymbol, PriceQuote } from "../types/domain.js";
-import { saveFuelPrice } from "../db/index.js";
+import type { PriceHistoryRepository } from "../db/index.js";
 import { instruments } from "./instrument-registry.js";
 import type { GoldService } from "./gold.service.js";
 import type { EiaProvider } from "./price-providers/eia.provider.js";
@@ -25,6 +25,7 @@ export class PriceService {
     private readonly giaXangHomNayProvider: GiaXangHomNayProvider,
     private readonly goldService: GoldService,
     private readonly cacheTtlMs: number,
+    private readonly priceHistory: PriceHistoryRepository,
   ) {}
 
   async getQuote(symbol: CommoditySymbol): Promise<PriceQuote> {
@@ -46,7 +47,7 @@ export class PriceService {
           : await this.eiaProvider.fetchQuote(symbol);
 
     if (symbol !== "gold") {
-      this.saveFetchedQuote(quote);
+      await this.saveFetchedQuote(quote);
     }
 
     this.cache.set(symbol, {
@@ -86,9 +87,9 @@ export class PriceService {
     return { quotes, failures };
   }
 
-  private saveFetchedQuote(quote: PriceQuote): void {
+  private async saveFetchedQuote(quote: PriceQuote): Promise<void> {
     if (quote.symbol === "gasoline" || quote.symbol === "diesel" || quote.symbol === "crude_oil") {
-      saveFuelPrice({
+      await this.priceHistory.saveFuelPrice({
         source: quote.source,
         fuelType: quote.symbol,
         price: quote.price,

@@ -7,7 +7,7 @@ Production-ready Telegram bot for gold, fuel, and commodity price updates built 
 - `/start`, `/gold`, `/fuel`, `/subscribe`, `/unsubscribe`, `/alert`, `/help`
 - Real-time precious metal prices through Gold API.
 - Fuel and crude oil prices through EIA Open Data.
-- SQLite-compatible persistence for users, subscriptions, alerts, and notification idempotency.
+- Neon Postgres persistence through Prisma for users, subscriptions, alerts, notification idempotency, and price history.
 - Scheduled daily updates and threshold alert checks.
 - GitHub Actions schedule entries plus a local `node-cron` worker.
 - Structured logging, validated environment variables, command menu registration, graceful shutdown, and error handling.
@@ -22,7 +22,7 @@ src/
   config/          environment validation
   services/        price providers, subscriptions, alerts, notifications
   schedulers/      GitHub Actions and local cron entrypoints
-  storage/         SQLite-compatible repositories and schema setup
+  storage/         Prisma-backed repositories for bot state
   types/           shared domain and bot context types
   utils/           formatting, logging, date helpers
 ```
@@ -34,11 +34,13 @@ Command handlers parse Telegram input and call services. Services own business l
 ```bash
 npm install
 cp .env.example .env
+npx neonctl@latest init
 npm run db:init
 npm run dev
 ```
 
 Create a Telegram bot with BotFather and set `BOT_TOKEN` in `.env`.
+Set `DATABASE_URL` to your Neon Postgres connection string. Include `sslmode=require` when your Neon connection string requires SSL.
 
 ## Price Data
 
@@ -118,14 +120,13 @@ npm run schedule:alerts
 
 GitHub Actions are configured in `.github/workflows/scheduled-jobs.yml`.
 
-Important: GitHub-hosted runners do not persist local files between runs. For scheduled GitHub jobs, use a shared SQLite-compatible database such as Turso/libSQL:
+Important: GitHub-hosted runners must use the shared Neon database. Add this repository secret in GitHub:
 
 ```dotenv
-DATABASE_URL=libsql://your-db.turso.io
-DATABASE_AUTH_TOKEN=...
+DATABASE_URL=YOUR_NEON_POSTGRES_DATABASE_URL
 ```
 
-For a single VPS or worker process, the default `file:./data/bot.db` is fine.
+The scheduled workflow runs `npx prisma generate` and `npx prisma migrate deploy` before executing jobs.
 
 ## Deployment
 

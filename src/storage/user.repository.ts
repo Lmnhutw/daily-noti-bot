@@ -1,6 +1,6 @@
-import type { Client } from "@libsql/client";
+import type { User } from "@prisma/client";
 import type { TelegramUser } from "../types/domain.js";
-import { optionalString, requiredNumber, requiredString, type DbRow } from "./row.js";
+import type { DatabaseClient } from "./database.js";
 
 export interface UpsertTelegramUserInput {
   telegramId: number;
@@ -12,75 +12,53 @@ export interface UpsertTelegramUserInput {
 }
 
 export class UserRepository {
-  constructor(private readonly client: Client) {}
+  constructor(private readonly client: DatabaseClient) {}
 
   async upsert(input: UpsertTelegramUserInput): Promise<TelegramUser> {
-    const now = new Date().toISOString();
-
-    await this.client.execute({
-      sql: `INSERT INTO users (
-          telegram_id,
-          chat_id,
-          username,
-          first_name,
-          last_name,
-          language_code,
-          created_at,
-          updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT (telegram_id) DO UPDATE SET
-          chat_id = excluded.chat_id,
-          username = excluded.username,
-          first_name = excluded.first_name,
-          last_name = excluded.last_name,
-          language_code = excluded.language_code,
-          updated_at = excluded.updated_at`,
-      args: [
-        input.telegramId,
-        input.chatId,
-        input.username ?? null,
-        input.firstName ?? null,
-        input.lastName ?? null,
-        input.languageCode ?? null,
-        now,
-        now,
-      ],
+    const user = await this.client.user.upsert({
+      where: { telegramId: BigInt(input.telegramId) },
+      create: {
+        telegramId: BigInt(input.telegramId),
+        chatId: BigInt(input.chatId),
+        username: input.username ?? null,
+        firstName: input.firstName ?? null,
+        lastName: input.lastName ?? null,
+        languageCode: input.languageCode ?? null,
+      },
+      update: {
+        chatId: BigInt(input.chatId),
+        username: input.username ?? null,
+        firstName: input.firstName ?? null,
+        lastName: input.lastName ?? null,
+        languageCode: input.languageCode ?? null,
+      },
     });
 
-    const user = await this.findByTelegramId(input.telegramId);
-
-    if (!user) {
-      throw new Error("User upsert did not return a persisted user");
-    }
-
-    return user;
+    return this.toUser(user);
   }
 
   async findByTelegramId(telegramId: number): Promise<TelegramUser | undefined> {
-    const result = await this.client.execute({
-      sql: "SELECT * FROM users WHERE telegram_id = ?",
-      args: [telegramId],
+    const user = await this.client.user.findUnique({
+      where: { telegramId: BigInt(telegramId) },
     });
 
-    const row = result.rows[0] as DbRow | undefined;
-    return row ? this.toUser(row) : undefined;
+    return user ? this.toUser(user) : undefined;
   }
 
   async count(): Promise<number> {
-    const result = await this.client.execute("SELECT COUNT(*) AS total FROM users");
-    return requiredNumber(result.rows[0] as DbRow, "total");
+    return this.client.user.count();
   }
 
-  private toUser(row: DbRow): TelegramUser {
+  private toUser(row: User): TelegramUser {
     return {
-      telegramId: requiredNumber(row, "telegram_id"),
-      chatId: requiredNumber(row, "chat_id"),
-      username: optionalString(row, "username"),
-      firstName: optionalString(row, "first_name"),
-      lastName: optionalString(row, "last_name"),
-      languageCode: optionalString(row, "language_code"),
-      createdAt: requiredString(row, "created_at"),
-      updatedAt: requiredString(row, "updated_at"),
+      telegramId: Number(row.telegramId),
+      chatId: Number(row.chatId),
+      username: row.username ?? undefined,
+      firstName: row.firstName ?? undefined,
+      lastName: row.lastName ?? undefined,
+      languageCode: row.languageCode ?? undefined,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
     };
   }
 }

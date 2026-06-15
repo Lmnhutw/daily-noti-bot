@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  telegramId    BigInt         @id @map("telegram_id")
+  chatId        BigInt         @map("chat_id")
+  username      String?
+  firstName     String?        @map("first_name")
+  lastName      String?        @map("last_name")
+  languageCode  String?        @map("language_code")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  alerts        Alert[]
+  subscriptions Subscription[]
+
+  @@map("users")
+}
+
+model Subscription {
+  id         Int      @id @default(autoincrement())
+  telegramId BigInt   @map("telegram_id")
+  chatId     BigInt   @map("chat_id")
+  topic      String
+  createdAt  DateTime @default(now()) @map("created_at")
+  user       User     @relation(fields: [telegramId], references: [telegramId], onDelete: Cascade)
+
+  @@unique([telegramId, chatId, topic])
+  @@index([chatId, topic], map: "subscriptions_chat_topic_idx")
+  @@map("subscriptions")
+}
+
+model Alert {
+  id          Int       @id @default(autoincrement())
+  telegramId  BigInt    @map("telegram_id")
+  chatId      BigInt    @map("chat_id")
+  symbol      String
+  direction   String
+  threshold   Float
+  currency    String
+  active      Boolean   @default(true)
+  lastPrice   Float?    @map("last_price")
+  triggeredAt DateTime? @map("triggered_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  user        User      @relation(fields: [telegramId], references: [telegramId], onDelete: Cascade)
+
+  @@index([active, symbol], map: "alerts_active_symbol_idx")
+  @@index([telegramId, chatId], map: "alerts_user_chat_idx")
+  @@map("alerts")
+}
+
+model NotificationLog {
+  key       String   @id
+  type      String
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([type, createdAt], map: "notification_log_type_idx")
+  @@map("notification_log")
+}
+
+model GoldPrice {
+  id        Int      @id @default(autoincrement())
+  source    String
+  buyPrice  Float    @map("buy_price")
+  sellPrice Float    @map("sell_price")
+  unit      String
+  rawJson   Json     @map("raw_json")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt], map: "gold_prices_created_at_idx")
+  @@map("gold_prices")
+}
+
+model FuelPrice {
+  id        Int      @id @default(autoincrement())
+  source    String
+  fuelType  String   @map("fuel_type")
+  price     Float
+  region    String
+  rawJson   Json     @map("raw_json")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt], map: "fuel_prices_created_at_idx")
+  @@index([fuelType, createdAt], map: "fuel_prices_type_created_at_idx")
+  @@map("fuel_prices")
+}

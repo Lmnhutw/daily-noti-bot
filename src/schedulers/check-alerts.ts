@@ -15,5 +15,5 @@ try {
   logger.error({ error }, "Alert check failed");
   process.exitCode = 1;
 } finally {
-  services.shutdown();
+  await services.shutdown();
 }

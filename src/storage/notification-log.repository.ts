@@ -1,22 +1,35 @@
-import type { Client } from "@libsql/client";
+import type { DatabaseClient } from "./database.js";
 
 export class NotificationLogRepository {
-  constructor(private readonly client: Client) {}
+  constructor(private readonly client: DatabaseClient) {}
 
   async claim(key: string, type: string, metadata?: unknown): Promise<boolean> {
-    const result = await this.client.execute({
-      sql: `INSERT OR IGNORE INTO notification_log (key, type, metadata, created_at)
-        VALUES (?, ?, ?, ?)`,
-      args: [key, type, metadata ? JSON.stringify(metadata) : null, new Date().toISOString()],
-    });
+    try {
+      await this.client.notificationLog.create({
+        data: {
+          key,
+          type,
+          metadata: metadata === undefined ? undefined : JSON.parse(JSON.stringify(metadata)),
+        },
+      });
 
-    return result.rowsAffected > 0;
+      return true;
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        return false;
+      }
+
+      throw error;
+    }
   }
 
   async release(key: string): Promise<void> {
-    await this.client.execute({
-      sql: "DELETE FROM notification_log WHERE key = ?",
-      args: [key],
+    await this.client.notificationLog.deleteMany({
+      where: { key },
     });
   }
+}
+
+function isUniqueConstraintError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
 }

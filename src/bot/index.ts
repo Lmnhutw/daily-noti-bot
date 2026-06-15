@@ -29,7 +29,7 @@ logger.info("Telegram bot started");
 async function shutdown(signal: NodeJS.Signals): Promise<void> {
   logger.info({ signal }, "Stopping Telegram bot");
   await runner.stop();
-  services.shutdown();
+  await services.shutdown();
 }
 
 process.once("SIGINT", shutdown);
@@ -41,6 +41,6 @@ process.on("unhandledRejection", (error) => {
 
 process.on("uncaughtException", (error) => {
   logger.fatal({ error }, "Uncaught exception");
-  services.shutdown();
+  void services.shutdown();
   process.exit(1);
 });

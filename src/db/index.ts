@@ -1,8 +1,5 @@
-import Database from "better-sqlite3";
-import { mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { env } from "../config/env.js";
-import { createApiDataTablesSql } from "./schema.js";
+import type { Prisma } from "@prisma/client";
+import type { DatabaseClient } from "../storage/database.js";
 
 export type ReportPeriod = "week" | "month" | "year";
 
@@ -42,73 +39,85 @@ export interface FuelPriceRow {
   created_at: string;
 }
 
-const databasePath = resolve(process.cwd(), env.DATABASE_PATH);
-mkdirSync(dirname(databasePath), { recursive: true });
+export class PriceHistoryRepository {
+  constructor(private readonly client: DatabaseClient) {}
 
-const db = new Database(databasePath);
-db.pragma("journal_mode = WAL");
-db.exec(createApiDataTablesSql);
+  async saveGoldPrice(data: GoldPriceInput): Promise<void> {
+    await this.client.goldPrice.create({
+      data: {
+        source: data.source,
+        buyPrice: data.buyPrice,
+        sellPrice: data.sellPrice,
+        unit: data.unit,
+        rawJson: toJson(data.rawJson),
+      },
+    });
+  }
 
-const insertGoldPrice = db.prepare(`
-  INSERT INTO gold_prices (source, buy_price, sell_price, unit, raw_json)
-  VALUES (@source, @buyPrice, @sellPrice, @unit, @rawJson)
-`);
+  async saveFuelPrice(data: FuelPriceInput): Promise<void> {
+    await this.client.fuelPrice.create({
+      data: {
+        source: data.source,
+        fuelType: data.fuelType,
+        price: data.price,
+        region: data.region,
+        rawJson: toJson(data.rawJson),
+      },
+    });
+  }
 
-const insertFuelPrice = db.prepare(`
-  INSERT INTO fuel_prices (source, fuel_type, price, region, raw_json)
-  VALUES (@source, @fuelType, @price, @region, @rawJson)
-`);
+  async getGoldPricesByPeriod(period: ReportPeriod): Promise<GoldPriceRow[]> {
+    const rows = await this.client.goldPrice.findMany({
+      where: { createdAt: { gte: periodStart(period) } },
+      orderBy: { createdAt: "asc" },
+    });
 
-const selectGoldPricesByPeriod = db.prepare(`
-  SELECT id, source, buy_price, sell_price, unit, raw_json, created_at
-  FROM gold_prices
-  WHERE created_at >= datetime('now', ?)
-  ORDER BY created_at ASC
-`);
+    return rows.map((row) => ({
+      id: row.id,
+      source: row.source,
+      buy_price: row.buyPrice,
+      sell_price: row.sellPrice,
+      unit: row.unit,
+      raw_json: JSON.stringify(row.rawJson),
+      created_at: row.createdAt.toISOString(),
+    }));
+  }
 
-const selectFuelPricesByPeriod = db.prepare(`
-  SELECT id, source, fuel_type, price, region, raw_json, created_at
-  FROM fuel_prices
-  WHERE created_at >= datetime('now', ?)
-  ORDER BY created_at ASC
-`);
+  async getFuelPricesByPeriod(period: ReportPeriod): Promise<FuelPriceRow[]> {
+    const rows = await this.client.fuelPrice.findMany({
+      where: { createdAt: { gte: periodStart(period) } },
+      orderBy: { createdAt: "asc" },
+    });
 
-export function saveGoldPrice(data: GoldPriceInput): void {
-  insertGoldPrice.run({
-    source: data.source,
-    buyPrice: data.buyPrice,
-    sellPrice: data.sellPrice,
-    unit: data.unit,
-    rawJson: JSON.stringify(data.rawJson),
-  });
+    return rows.map((row) => ({
+      id: row.id,
+      source: row.source,
+      fuel_type: row.fuelType,
+      price: row.price,
+      region: row.region,
+      raw_json: JSON.stringify(row.rawJson),
+      created_at: row.createdAt.toISOString(),
+    }));
+  }
 }
 
-export function saveFuelPrice(data: FuelPriceInput): void {
-  insertFuelPrice.run({
-    source: data.source,
-    fuelType: data.fuelType,
-    price: data.price,
-    region: data.region,
-    rawJson: JSON.stringify(data.rawJson),
-  });
-}
+function periodStart(period: ReportPeriod): Date {
+  const start = new Date();
 
-export function getGoldPricesByPeriod(period: ReportPeriod): GoldPriceRow[] {
-  return selectGoldPricesByPeriod.all(periodModifier(period)) as GoldPriceRow[];
-}
-
-export function getFuelPricesByPeriod(period: ReportPeriod): FuelPriceRow[] {
-  return selectFuelPricesByPeriod.all(periodModifier(period)) as FuelPriceRow[];
-}
-
-function periodModifier(period: ReportPeriod): string {
   if (period === "week") {
-    return "-7 days";
+    start.setDate(start.getDate() - 7);
+    return start;
   }
 
   if (period === "month") {
-    return "-1 month";
+    start.setMonth(start.getMonth() - 1);
+    return start;
   }
 
-  return "-1 year";
+  start.setFullYear(start.getFullYear() - 1);
+  return start;
+}
+
+function toJson(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 }

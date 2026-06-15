@@ -15,14 +15,24 @@ const defaultedString = (defaultValue: string) =>
   z.preprocess(emptyToUndefined, z.string().min(1).default(defaultValue));
 const defaultedNumber = (defaultValue: number) =>
   z.preprocess(emptyToUndefined, z.coerce.number().int().positive().default(defaultValue));
+const databaseUrl = () =>
+  z.preprocess((value) => {
+    const normalized = emptyToUndefined(value);
+
+    if (normalized === undefined && process.env.NODE_ENV === "test") {
+      return "postgresql://user:password@localhost:5432/daily_noti_bot";
+    }
+
+    return normalized;
+  }, z.string().min(1, "DATABASE_URL is required").refine((value) => value.startsWith("postgresql://") || value.startsWith("postgres://"), {
+    message: "DATABASE_URL must be a PostgreSQL connection string",
+  }));
 
 const envSchema = z.object({
   BOT_TOKEN: z.string().min(1, "BOT_TOKEN is required"),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal", "silent"]).default("info"),
-  DATABASE_PATH: defaultedString("./data/database.sqlite"),
-  DATABASE_URL: defaultedString("file:./data/bot.db"),
-  DATABASE_AUTH_TOKEN: optionalSecret(),
+  DATABASE_URL: databaseUrl(),
   ADMIN_USER_IDS: z.string().default(""),
   DEFAULT_CURRENCY: defaultedString("USD"),
   PRICE_CACHE_TTL_SECONDS: defaultedNumber(120),

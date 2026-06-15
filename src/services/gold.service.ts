@@ -1,4 +1,4 @@
-import { saveGoldPrice } from "../db/index.js";
+import type { PriceHistoryRepository } from "../db/index.js";
 import type {
   GoldAggregationResult,
   GoldFallbackResult,
@@ -24,6 +24,7 @@ export class GoldService {
     private readonly providers: GoldPriceProvider[],
     private readonly cacheTtlMs: number,
     private readonly fallbackOrder: GoldProviderId[],
+    private readonly priceHistory: PriceHistoryRepository,
   ) {}
 
   async getAllGoldPrices(forceRefresh = false): Promise<GoldAggregationResult> {
@@ -73,7 +74,7 @@ export class GoldService {
   private async fetchProvider(provider: GoldPriceProvider): Promise<GoldProviderResult> {
     try {
       const price = await provider.fetchGoldPrice();
-      this.saveFetchedPrice(price);
+      await this.saveFetchedPrice(price);
 
       return {
         providerId: provider.id,
@@ -95,9 +96,9 @@ export class GoldService {
     }
   }
 
-  private saveFetchedPrice(price: NormalizedGoldPrice): void {
+  private async saveFetchedPrice(price: NormalizedGoldPrice): Promise<void> {
     try {
-      saveGoldPrice({
+      await this.priceHistory.saveGoldPrice({
         source: price.provider,
         buyPrice: price.buyPrice,
         sellPrice: price.sellPrice,

@@ -75,7 +75,7 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
   logger.info({ signal }, "Stopping local cron worker");
   alertTask.stop();
   dailyTask.stop();
-  services.shutdown();
+  await services.shutdown();
 }
 
 process.once("SIGINT", shutdown);

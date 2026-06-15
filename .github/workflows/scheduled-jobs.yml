@@ -18,23 +18,27 @@ jobs:
           cache: "npm"
           cache-dependency-path: package-lock.json
       - run: npm ci
-      - run: npm run build
       - name: Validate scheduled job secrets
         shell: bash
         run: |
           test -n "$BOT_TOKEN" || { echo "BOT_TOKEN secret is required"; exit 1; }
           test -n "$DATABASE_URL" || { echo "DATABASE_URL secret is required for scheduled jobs"; exit 1; }
           case "$DATABASE_URL" in
-            file:*) echo "DATABASE_URL must point to a shared database for scheduled jobs"; exit 1 ;;
+            postgres://*|postgresql://*) ;;
+            *) echo "DATABASE_URL must be a PostgreSQL connection string"; exit 1 ;;
           esac
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - run: npx prisma generate
+      - run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - run: npm run build
       - run: npm run schedule:alerts
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DATABASE_AUTH_TOKEN: ${{ secrets.DATABASE_AUTH_TOKEN }}
           EIA_API_KEY: ${{ secrets.EIA_API_KEY }}
           GOLD_API_KEY: ${{ secrets.GOLD_API_KEY }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
@@ -52,24 +56,28 @@ jobs:
           cache: "npm"
           cache-dependency-path: package-lock.json
       - run: npm ci
-      - run: npm run build
       - name: Validate scheduled job secrets
         shell: bash
         run: |
           test -n "$BOT_TOKEN" || { echo "BOT_TOKEN secret is required"; exit 1; }
           test -n "$DATABASE_URL" || { echo "DATABASE_URL secret is required for scheduled jobs"; exit 1; }
           case "$DATABASE_URL" in
-            file:*) echo "DATABASE_URL must point to a shared database for scheduled jobs"; exit 1 ;;
+            postgres://*|postgresql://*) ;;
+            *) echo "DATABASE_URL must be a PostgreSQL connection string"; exit 1 ;;
           esac
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - run: npx prisma generate
+      - run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - run: npm run build
       - run: npm run schedule:daily
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DATABASE_AUTH_TOKEN: ${{ secrets.DATABASE_AUTH_TOKEN }}
           EIA_API_KEY: ${{ secrets.EIA_API_KEY }}
           GOLD_API_KEY: ${{ secrets.GOLD_API_KEY }}
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          # DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           NODE_ENV: production

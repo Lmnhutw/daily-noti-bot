@@ -1,8 +1,8 @@
-import type { Client } from "@libsql/client";
 import { env } from "../config/env.js";
+import { PriceHistoryRepository } from "../db/index.js";
 import { createGoldProviders } from "../providers/index.js";
 import { AlertRepository } from "../storage/alert.repository.js";
-import { createDatabaseClient, migrateDatabase } from "../storage/database.js";
+import { createDatabaseClient, type DatabaseClient } from "../storage/database.js";
 import { NotificationLogRepository } from "../storage/notification-log.repository.js";
 import { SubscriptionRepository } from "../storage/subscription.repository.js";
 import { UserRepository } from "../storage/user.repository.js";
@@ -17,7 +17,7 @@ import { SubscriptionService } from "./subscription.service.js";
 import { UserService } from "./user.service.js";
 
 export interface AppServices {
-  client: Client;
+  client: DatabaseClient;
   users: UserRepository;
   subscriptions: SubscriptionRepository;
   alerts: AlertRepository;
@@ -28,17 +28,17 @@ export interface AppServices {
   goldService: GoldService;
   priceService: PriceService;
   discordWebhookService: DiscordWebhookService;
-  shutdown: () => void;
+  shutdown: () => Promise<void>;
 }
 
 export async function createAppServices(): Promise<AppServices> {
   const client = createDatabaseClient();
-  await migrateDatabase(client);
 
   const users = new UserRepository(client);
   const subscriptions = new SubscriptionRepository(client);
   const alerts = new AlertRepository(client);
   const notificationLog = new NotificationLogRepository(client);
+  const priceHistory = new PriceHistoryRepository(client);
   const goldApiProvider = new GoldApiProvider();
   const eiaProvider = new EiaProvider();
   const giaXangHomNayProvider = new GiaXangHomNayProvider();
@@ -46,6 +46,7 @@ export async function createAppServices(): Promise<AppServices> {
     createGoldProviders(),
     env.PRICE_CACHE_TTL_SECONDS * 1000,
     parseFallbackOrder(env.GOLD_PROVIDER_FALLBACK_ORDER),
+    priceHistory,
   );
   const priceService = new PriceService(
     goldApiProvider,
@@ -53,6 +54,7 @@ export async function createAppServices(): Promise<AppServices> {
     giaXangHomNayProvider,
     goldService,
     env.PRICE_CACHE_TTL_SECONDS * 1000,
+    priceHistory,
   );
   const userService = new UserService(users);
   const subscriptionService = new SubscriptionService(subscriptions);
@@ -71,7 +73,7 @@ export async function createAppServices(): Promise<AppServices> {
     goldService,
     priceService,
     discordWebhookService,
-    shutdown: () => client.close(),
+    shutdown: () => client.$disconnect(),
   };
 }
 
