@@ -11,6 +11,7 @@ Production-ready Telegram bot for gold, fuel, and commodity price updates built 
 - Scheduled daily updates and threshold alert checks.
 - GitHub Actions schedule entries plus a local `node-cron` worker.
 - Structured logging, validated environment variables, command menu registration, graceful shutdown, and error handling.
+- Telegram HTML message formatting with bold labels, monospace examples, corrected icons, escaped dynamic content, and clearer spacing.
 - Optional Discord webhook mirroring for scheduled notifications.
 
 ## Architecture
@@ -26,10 +27,10 @@ src/
   schedulers/      GitHub Actions and local cron entrypoints
   storage/         Prisma-backed repositories for bot state
   types/           shared domain and bot context types
-  utils/           formatting, logging, date helpers
+  utils/           Telegram formatting, logging, date helpers
 ```
 
-Command handlers parse Telegram input and call services. Services own business logic. Repositories use Prisma Client for database access. Vercel receives Telegram updates through `/api/telegram`, while scheduled jobs reuse the same services from GitHub Actions.
+Command handlers parse Telegram input, call services, and return formatted Telegram messages. Services own business logic. Repositories use Prisma Client for database access. Vercel receives Telegram updates through `/api/telegram`, while scheduled jobs reuse the same services from GitHub Actions.
 
 ## Prerequisites
 
@@ -116,7 +117,7 @@ SJC_GOLD_SOURCE_URLS=https://giavang.now/api/prices?type=SJL1L10,https://www.van
 PNJ_GOLD_SOURCE_URLS=https://giavang.now/api/prices?type=PQHNVM,https://giavang.now/api/prices?type=PQHN24NTT,https://www.vang.today/api/prices?type=PQHNVM,https://www.vang.today/api/prices?type=PQHN24NTT
 ```
 
-Mi Hong uses `https://api.mihong.vn/v1/gold-prices?market=domestic` by default. Global uses `https://api.mihong.vn/v1/gold-prices?market=global` by default. SJC and PNJ support comma-separated dynamic source URLs, then fall back to HTML scraping URLs. If a provider has no usable buy/sell data, the Telegram message shows `tạm thời không có số liệu` for that provider.
+Mi Hong uses `https://api.mihong.vn/v1/gold-prices?market=domestic` by default. Global uses `https://api.mihong.vn/v1/gold-prices?market=global` by default. SJC and PNJ support comma-separated dynamic source URLs, then fall back to HTML scraping URLs. If a provider has no usable buy/sell data, the Telegram message shows `unavailable` for that provider.
 
 The older Gold API integration remains available for non-gold metals through `https://api.gold-api.com/price/{symbol}` for `XAG`, `XPT`, `XPD`, and `HG`.
 
@@ -143,15 +144,26 @@ EIA requires an API key. Set `EIA_API_KEY` in production.
 /start
 /gold
 /fuel
-/subscribe gold|metals|fuel|oil|all
-/unsubscribe gold|metals|fuel|oil|all
+/subscribe
+/subscribe gold|fuel|exchange_rates|crypto|stocks
+/unsubscribe gold|fuel|exchange_rates|crypto|stocks|all
 /alert gold above 2300
 /alert diesel below 3.50
 /alert list
 /alert remove 12
 ```
 
+`/subscribe` opens an inline topic picker with selected-topic icons and confirm/cancel actions. The direct `/subscribe <topic>` form remains available for quick subscriptions. Legacy subscription aliases such as `metals` and `oil` are still normalized internally for existing rows.
+
 Alerts are one-shot by default. After an alert fires successfully, it is marked inactive.
+
+## Message Formatting
+
+Telegram replies use `parse_mode: HTML` through `src/utils/telegram-format.ts`. Use the shared `bold`, `code`, `escapeHtml`, and `htmlMessageOptions` helpers when adding new user-facing bot messages.
+
+Dynamic values from providers, users, alerts, and errors must be escaped before they are inserted into Telegram HTML. Telegram bot messages do not support arbitrary font colors, so the bot relies on supported formatting: bold labels, monospace command examples and IDs, line spacing, bullets, and icons.
+
+Scheduled Telegram notifications use the same HTML formatting. Discord webhook mirrors strip Telegram HTML before posting so Discord receives plain readable text.
 
 ## Scheduled Jobs
 
