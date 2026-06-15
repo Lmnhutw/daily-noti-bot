@@ -18,7 +18,17 @@ const commandMenu = [
   { command: "help", description: "Show help" },
 ];
 
-export async function registerCommands(bot: Bot<BotContext>, services: AppServices): Promise<void> {
+export interface RegisterCommandsOptions {
+  syncCommandMenu?: boolean;
+}
+
+export async function registerCommands(
+  bot: Bot<BotContext>,
+  services: AppServices,
+  options: RegisterCommandsOptions = {},
+): Promise<void> {
+  const { syncCommandMenu = true } = options;
+
   registerStartCommand(bot, services);
   registerHelpCommand(bot);
   registerPriceCommands(bot, services);
@@ -26,5 +36,7 @@ export async function registerCommands(bot: Bot<BotContext>, services: AppServic
   registerAlertCommand(bot, services);
   registerAdminCommand(bot, services);
 
-  await bot.api.setMyCommands(commandMenu);
+  if (syncCommandMenu) {
+    await bot.api.setMyCommands(commandMenu);
+  }
 }

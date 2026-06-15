@@ -65,6 +65,15 @@ model NotificationLog {
   @@map("notification_log")
 }
 
+model BotSession {
+  key       String   @id
+  data      Json
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("bot_sessions")
+}
+
 model GoldPrice {
   id        Int      @id @default(autoincrement())
   source    String

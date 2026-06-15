@@ -1,13 +1,14 @@
-import { session, type Bot, type MiddlewareFn } from "grammy";
+import { session, type Bot, type MiddlewareFn, type StorageAdapter } from "grammy";
 import { adminUserIds } from "../config/env.js";
-import { initialSession, type BotContext } from "../types/context.js";
+import { initialSession, type BotContext, type SessionData } from "../types/context.js";
 import { logger } from "../utils/logger.js";
 
-export function registerMiddleware(bot: Bot<BotContext>): void {
+export function registerMiddleware(bot: Bot<BotContext>, storage?: StorageAdapter<SessionData>): void {
   bot.use(
     session({
       initial: initialSession,
       getSessionKey: (ctx) => (ctx.chat && ctx.from ? `${ctx.chat.id}:${ctx.from.id}` : undefined),
+      storage,
     }),
   );
 

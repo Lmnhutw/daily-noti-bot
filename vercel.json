@@ -1,0 +1,9 @@
+{
+  "buildCommand": "npm run vercel-build",
+  "outputDirectory": "public",
+  "functions": {
+    "api/telegram.ts": {
+      "maxDuration": 60
+    }
+  }
+}

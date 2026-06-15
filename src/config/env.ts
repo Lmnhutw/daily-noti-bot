@@ -15,6 +15,8 @@ const defaultedString = (defaultValue: string) =>
   z.preprocess(emptyToUndefined, z.string().min(1).default(defaultValue));
 const defaultedNumber = (defaultValue: number) =>
   z.preprocess(emptyToUndefined, z.coerce.number().int().positive().default(defaultValue));
+const defaultedUrl = (defaultValue: string) =>
+  z.preprocess(emptyToUndefined, z.string().url().default(defaultValue));
 const databaseUrl = () =>
   z.preprocess((value) => {
     const normalized = emptyToUndefined(value);
@@ -33,6 +35,9 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal", "silent"]).default("info"),
   DATABASE_URL: databaseUrl(),
+  TELEGRAM_WEBHOOK_URL: defaultedUrl("https://daily-noti-bot.vercel.app/api/telegram"),
+  TELEGRAM_WEBHOOK_SECRET: optionalSecret(),
+  TELEGRAM_WEBHOOK_TIMEOUT_MS: defaultedNumber(25000),
   ADMIN_USER_IDS: z.string().default(""),
   DEFAULT_CURRENCY: defaultedString("USD"),
   PRICE_CACHE_TTL_SECONDS: defaultedNumber(120),

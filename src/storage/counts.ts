@@ -8,6 +8,7 @@ try {
     subscriptions: await client.subscription.count(),
     alerts: await client.alert.count(),
     notificationLog: await client.notificationLog.count(),
+    botSessions: await client.botSession.count(),
     goldPrices: await client.goldPrice.count(),
     fuelPrices: await client.fuelPrice.count(),
   };

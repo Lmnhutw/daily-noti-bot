@@ -4,6 +4,7 @@ import { createGoldProviders } from "../providers/index.js";
 import { AlertRepository } from "../storage/alert.repository.js";
 import { createDatabaseClient, type DatabaseClient } from "../storage/database.js";
 import { NotificationLogRepository } from "../storage/notification-log.repository.js";
+import { SessionRepository } from "../storage/session.repository.js";
 import { SubscriptionRepository } from "../storage/subscription.repository.js";
 import { UserRepository } from "../storage/user.repository.js";
 import { AlertService } from "./alert.service.js";
@@ -22,6 +23,7 @@ export interface AppServices {
   subscriptions: SubscriptionRepository;
   alerts: AlertRepository;
   notificationLog: NotificationLogRepository;
+  sessions: SessionRepository;
   userService: UserService;
   subscriptionService: SubscriptionService;
   alertService: AlertService;
@@ -38,6 +40,7 @@ export async function createAppServices(): Promise<AppServices> {
   const subscriptions = new SubscriptionRepository(client);
   const alerts = new AlertRepository(client);
   const notificationLog = new NotificationLogRepository(client);
+  const sessions = new SessionRepository(client);
   const priceHistory = new PriceHistoryRepository(client);
   const goldApiProvider = new GoldApiProvider();
   const eiaProvider = new EiaProvider();
@@ -67,6 +70,7 @@ export async function createAppServices(): Promise<AppServices> {
     subscriptions,
     alerts,
     notificationLog,
+    sessions,
     userService,
     subscriptionService,
     alertService,

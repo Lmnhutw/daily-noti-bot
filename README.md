@@ -16,6 +16,8 @@ Production-ready Telegram bot for gold, fuel, and commodity price updates built 
 ## Architecture
 
 ```text
+api/
+  telegram.ts     Vercel serverless webhook endpoint
 src/
   bot/             grammY bot composition, middleware, command menu
   commands/        thin Telegram command handlers
@@ -27,7 +29,7 @@ src/
   utils/           formatting, logging, date helpers
 ```
 
-Command handlers parse Telegram input and call services. Services own business logic. Repositories use Prisma Client for database access. Scheduled jobs reuse the same services as the bot listener.
+Command handlers parse Telegram input and call services. Services own business logic. Repositories use Prisma Client for database access. Vercel receives Telegram updates through `/api/telegram`, while scheduled jobs reuse the same services from GitHub Actions.
 
 ## Prerequisites
 
@@ -49,6 +51,7 @@ npm run dev
 
 Create a Telegram bot with BotFather and set `BOT_TOKEN` in `.env`.
 Set `DATABASE_URL` to your Neon Postgres connection string. Include `sslmode=require` when your Neon connection string requires SSL.
+`npm run dev` runs long polling for local development only. Production on Vercel uses Telegram webhooks.
 
 Do not commit `.env` or paste local secrets into logs, issues, or chat transcripts.
 
@@ -59,6 +62,7 @@ Required:
 ```dotenv
 BOT_TOKEN=
 DATABASE_URL=YOUR_NEON_POSTGRES_DATABASE_URL
+TELEGRAM_WEBHOOK_URL=https://daily-noti-bot.vercel.app/api/telegram
 ```
 
 Common optional values:
@@ -69,6 +73,7 @@ LOG_LEVEL=info
 GOLD_API_KEY=
 EIA_API_KEY=
 DISCORD_WEBHOOK_URL=
+TELEGRAM_WEBHOOK_SECRET=
 ```
 
 See `.env.example` for the full list of supported settings.
@@ -85,7 +90,7 @@ npm run db:migrate:deploy
 npm run db:counts
 ```
 
-`npm run db:counts` prints row counts for users, subscriptions, alerts, notification logs, gold prices, and fuel prices. For a fresh Neon database, these counts should start at zero.
+`npm run db:counts` prints row counts for users, subscriptions, alerts, notification logs, sessions, gold prices, and fuel prices. For a fresh Neon database, these counts should start at zero.
 
 ## Price Data
 
@@ -173,18 +178,58 @@ DATABASE_URL=YOUR_NEON_POSTGRES_DATABASE_URL
 
 Also add `BOT_TOKEN` and any provider API keys needed in production. The scheduled workflow validates `DATABASE_URL`, runs `npx prisma generate`, and runs `npx prisma migrate deploy` before executing jobs.
 
-## Deployment
+## Vercel Deployment
 
-Build and start:
+The production bot runs through the Vercel Function at `/api/telegram`. Configure these Vercel environment variables for Production and Preview:
+
+```dotenv
+BOT_TOKEN=
+DATABASE_URL=YOUR_NEON_POSTGRES_DATABASE_URL
+TELEGRAM_WEBHOOK_URL=https://daily-noti-bot.vercel.app/api/telegram
+TELEGRAM_WEBHOOK_SECRET=
+GOLD_API_KEY=
+EIA_API_KEY=
+DISCORD_WEBHOOK_URL=
+```
+
+`TELEGRAM_WEBHOOK_SECRET` is optional but recommended. If set, Telegram must send the matching `X-Telegram-Bot-Api-Secret-Token` header.
+
+Deploy:
+
+```bash
+npm run lint
+npm test
+npx vercel deploy --prod
+```
+
+Run database migrations against Neon:
+
+```bash
+npm run db:migrate:deploy
+```
+
+Register the Telegram webhook after the production deployment is live:
+
+```bash
+npm run telegram:set-webhook
+```
+
+This points Telegram to `https://daily-noti-bot.vercel.app/api/telegram`. To stop webhook delivery:
+
+```bash
+npm run telegram:delete-webhook
+```
+
+## Local Polling
+
+For local development without a public HTTPS URL:
 
 ```bash
 npm run build
 npm start
 ```
 
-Use long polling on an always-on host. Set a restart policy through your process manager or platform. Store secrets in deployment environment variables, not in `.env` committed to Git.
-
-Vercel is not recommended for the current bot listener because `npm start` runs a long-lived Telegram polling process. To deploy this application on Vercel, refactor the bot to use Telegram webhooks and serverless route handlers. Until then, use an always-on runtime for the bot listener and keep GitHub Actions for scheduled jobs.
+Before switching back to local long polling, delete the Telegram webhook with `npm run telegram:delete-webhook`. Store secrets in deployment environment variables, not in committed files.
 
 ## Roadmap
 
