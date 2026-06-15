@@ -27,7 +27,14 @@ src/
   utils/           formatting, logging, date helpers
 ```
 
-Command handlers parse Telegram input and call services. Services own business logic. Repositories own SQL. Scheduled jobs reuse the same services as the bot listener.
+Command handlers parse Telegram input and call services. Services own business logic. Repositories use Prisma Client for database access. Scheduled jobs reuse the same services as the bot listener.
+
+## Prerequisites
+
+- Node.js 20.11 or newer.
+- A Telegram bot token from BotFather.
+- A Neon Postgres database.
+- A `DATABASE_URL` connection string for Neon, including `sslmode=require` when required by the connection string.
 
 ## Setup
 
@@ -35,12 +42,50 @@ Command handlers parse Telegram input and call services. Services own business l
 npm install
 cp .env.example .env
 npx neonctl@latest init
-npm run db:init
+npm run db:generate
+npm run db:migrate:deploy
 npm run dev
 ```
 
 Create a Telegram bot with BotFather and set `BOT_TOKEN` in `.env`.
 Set `DATABASE_URL` to your Neon Postgres connection string. Include `sslmode=require` when your Neon connection string requires SSL.
+
+Do not commit `.env` or paste local secrets into logs, issues, or chat transcripts.
+
+## Environment Variables
+
+Required:
+
+```dotenv
+BOT_TOKEN=
+DATABASE_URL=YOUR_NEON_POSTGRES_DATABASE_URL
+```
+
+Common optional values:
+
+```dotenv
+ADMIN_USER_IDS=
+LOG_LEVEL=info
+GOLD_API_KEY=
+EIA_API_KEY=
+DISCORD_WEBHOOK_URL=
+```
+
+See `.env.example` for the full list of supported settings.
+
+## Database
+
+The app uses Prisma with the PostgreSQL provider. The schema and migrations live under `prisma/`.
+
+Useful commands:
+
+```bash
+npm run db:generate
+npm run db:migrate:deploy
+npm run db:counts
+```
+
+`npm run db:counts` prints row counts for users, subscriptions, alerts, notification logs, gold prices, and fuel prices. For a fresh Neon database, these counts should start at zero.
 
 ## Price Data
 
@@ -126,7 +171,7 @@ Important: GitHub-hosted runners must use the shared Neon database. Add this rep
 DATABASE_URL=YOUR_NEON_POSTGRES_DATABASE_URL
 ```
 
-The scheduled workflow runs `npx prisma generate` and `npx prisma migrate deploy` before executing jobs.
+Also add `BOT_TOKEN` and any provider API keys needed in production. The scheduled workflow validates `DATABASE_URL`, runs `npx prisma generate`, and runs `npx prisma migrate deploy` before executing jobs.
 
 ## Deployment
 
@@ -138,6 +183,8 @@ npm start
 ```
 
 Use long polling on an always-on host. Set a restart policy through your process manager or platform. Store secrets in deployment environment variables, not in `.env` committed to Git.
+
+Vercel is not recommended for the current bot listener because `npm start` runs a long-lived Telegram polling process. To deploy this application on Vercel, refactor the bot to use Telegram webhooks and serverless route handlers. Until then, use an always-on runtime for the bot listener and keep GitHub Actions for scheduled jobs.
 
 ## Roadmap
 
