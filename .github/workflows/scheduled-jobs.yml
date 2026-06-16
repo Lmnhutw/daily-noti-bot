@@ -1,21 +1,71 @@
 name: Scheduled bot jobs
 
 on:
+  push:
+    branches:
+      - main
+  pull_request:
   schedule:
     - cron: "*/15 * * * *"
+    # 07:00 Asia/Saigon. GitHub cron uses UTC.
     - cron: "0 0 * * *"
   workflow_dispatch:
+    inputs:
+      job:
+        description: "Scheduled job to run"
+        required: true
+        default: "both"
+        type: choice
+        options:
+          - both
+          - alerts
+          - daily
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "24"
 
 jobs:
-  check-alerts:
+  validate:
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
-          cache: "npm"
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+        env:
+          DATABASE_URL: postgresql://user:password@localhost:5432/daily_noti_bot
+      - run: npm run lint
+      - run: npm test
+
+  check-alerts:
+    if: >-
+      ${{
+        github.event_name == 'schedule' ||
+        (
+          github.event_name == 'workflow_dispatch' &&
+          (inputs.job == 'both' || inputs.job == 'alerts')
+        )
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: scheduled-bot-jobs-alerts
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
       - name: Validate scheduled job secrets
@@ -31,29 +81,44 @@ jobs:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
       - run: npx prisma generate
-      - run: npx prisma migrate deploy
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
       - run: npm run build
+      - run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
       - run: npm run schedule:alerts
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           EIA_API_KEY: ${{ secrets.EIA_API_KEY }}
           GOLD_API_KEY: ${{ secrets.GOLD_API_KEY }}
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          # DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           NODE_ENV: production
 
   daily-updates:
-    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 0 * * *'
+    if: >-
+      ${{
+        (
+          github.event_name == 'schedule' &&
+          github.event.schedule == '0 0 * * *'
+        ) ||
+        (
+          github.event_name == 'workflow_dispatch' &&
+          (inputs.job == 'both' || inputs.job == 'daily')
+        )
+      }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    concurrency:
+      group: scheduled-bot-jobs-daily
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
-          cache: "npm"
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
       - name: Validate scheduled job secrets
@@ -69,15 +134,17 @@ jobs:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
       - run: npx prisma generate
-      - run: npx prisma migrate deploy
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
       - run: npm run build
+      - run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
       - run: npm run schedule:daily
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           EIA_API_KEY: ${{ secrets.EIA_API_KEY }}
           GOLD_API_KEY: ${{ secrets.GOLD_API_KEY }}
-          # DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           NODE_ENV: production
